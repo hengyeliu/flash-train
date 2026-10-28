@@ -131,3 +131,56 @@ extern "C" FTrainStatus ftrainPatternAddGroupedABGemm(FTrainPattern pattern, FTr
         *op = pattern->builder.addOperation<ftrain::OperationKind::kGroupedABGemm>(a, b, c, d, alpha, beta);
     });
 }
+
+extern "C" FTrainStatus ftrainPatternAddLinearCEForwardPartials(
+    FTrainPattern pattern, FTrainLinearCEForwardPartialsOpId* op, FTrainTensorId hidden, FTrainTensorId weight,
+    FTrainTensorId labels, FTrainTensorId lse_local, FTrainTensorId target_logit_local) {
+    return ftrain::invokeApi([&] {
+        if (pattern == nullptr) {
+            throw ftrain::Exception(FTRAIN_STATUS_INVALID_ARGUMENT,
+                                    "ftrainPatternAddLinearCEForwardPartials: pattern must not be null");
+        }
+        if (op == nullptr) {
+            throw ftrain::Exception(FTRAIN_STATUS_INVALID_ARGUMENT,
+                                    "ftrainPatternAddLinearCEForwardPartials: op output must not be null");
+        }
+        *op = pattern->builder.addOperation<ftrain::OperationKind::kLinearCEForwardPartials>(
+            hidden, weight, labels, lse_local, target_logit_local);
+    });
+}
+
+extern "C" FTrainStatus ftrainPatternAddLinearCEForwardFinalize(
+    FTrainPattern pattern, FTrainLinearCEForwardFinalizeOpId* op, FTrainTensorId lse, FTrainTensorId target_logit,
+    FTrainTensorId labels, FTrainTensorId loss, FTrainTensorId maximum, FTrainTensorId saved_lse,
+    FTrainTensorId num_valid_tokens) {
+    return ftrain::invokeApi([&] {
+        if (pattern == nullptr) {
+            throw ftrain::Exception(FTRAIN_STATUS_INVALID_ARGUMENT,
+                                    "ftrainPatternAddLinearCEForwardFinalize: pattern must not be null");
+        }
+        if (op == nullptr) {
+            throw ftrain::Exception(FTRAIN_STATUS_INVALID_ARGUMENT,
+                                    "ftrainPatternAddLinearCEForwardFinalize: op output must not be null");
+        }
+        *op = pattern->builder.addOperation<ftrain::OperationKind::kLinearCEForwardFinalize>(
+            lse, target_logit, labels, loss, maximum, saved_lse, num_valid_tokens);
+    });
+}
+
+extern "C" FTrainStatus ftrainPatternAddLinearCEBackward(
+    FTrainPattern pattern, FTrainLinearCEBackwardOpId* op, FTrainTensorId dloss, FTrainTensorId hidden,
+    FTrainTensorId weight, FTrainTensorId labels, FTrainTensorId maximum, FTrainTensorId saved_lse,
+    FTrainTensorId num_valid_tokens, FTrainTensorId main_grad, FTrainTensorId d_hidden, FTrainTensorId d_weight) {
+    return ftrain::invokeApi([&] {
+        if (pattern == nullptr) {
+            throw ftrain::Exception(FTRAIN_STATUS_INVALID_ARGUMENT,
+                                    "ftrainPatternAddLinearCEBackward: pattern must not be null");
+        }
+        if (op == nullptr) {
+            throw ftrain::Exception(FTRAIN_STATUS_INVALID_ARGUMENT,
+                                    "ftrainPatternAddLinearCEBackward: op output must not be null");
+        }
+        *op = pattern->builder.addOperation<ftrain::OperationKind::kLinearCEBackward>(
+            dloss, hidden, weight, labels, maximum, saved_lse, num_valid_tokens, main_grad, d_hidden, d_weight);
+    });
+}

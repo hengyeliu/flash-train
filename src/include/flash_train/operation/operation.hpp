@@ -7,11 +7,13 @@
 #include <variant>
 
 #include "flash_train/operation/gemm.hpp"
+#include "flash_train/operation/linear_ce.hpp"
 
 namespace ftrain {
 
-using OperationValue =
-    std::variant<GemmAttributes, GroupedABCDGemmAttributes, GroupedBCDGemmAttributes, GroupedABGemmAttributes>;
+using OperationValue = std::variant<GemmAttributes, GroupedABCDGemmAttributes, GroupedBCDGemmAttributes,
+                                    GroupedABGemmAttributes, LinearCEForwardPartialsAttributes,
+                                    LinearCEForwardFinalizeAttributes, LinearCEBackwardAttributes>;
 
 }  // namespace ftrain
 

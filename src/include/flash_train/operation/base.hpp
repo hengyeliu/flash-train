@@ -26,6 +26,9 @@ enum class OperationKind : std::uint16_t {
     kGroupedABCDGemm,
     kGroupedBCDGemm,
     kGroupedABGemm,
+    kLinearCEForwardPartials,
+    kLinearCEForwardFinalize,
+    kLinearCEBackward,
 };
 
 // Identifies an operand within its owning PatternBuilder.

@@ -73,6 +73,22 @@ enum {
     FTRAIN_INDEX_TYPE_COUNT,
 };
 
+typedef uint8_t FTrainLinearCEReduction;
+enum {
+    FTRAIN_LINEAR_CE_REDUCTION_INVALID = 0,
+    FTRAIN_LINEAR_CE_REDUCTION_MEAN    = 1,
+    FTRAIN_LINEAR_CE_REDUCTION_SUM     = 2,
+    FTRAIN_LINEAR_CE_REDUCTION_COUNT,
+};
+
+typedef uint8_t FTrainLinearCEMainGradMode;
+enum {
+    FTRAIN_LINEAR_CE_MAIN_GRAD_MODE_INVALID     = 0,
+    FTRAIN_LINEAR_CE_MAIN_GRAD_MODE_RETURN_GRAD = 1,
+    FTRAIN_LINEAR_CE_MAIN_GRAD_MODE_ACCUMULATE  = 2,
+    FTRAIN_LINEAR_CE_MAIN_GRAD_MODE_COUNT,
+};
+
 /* Storage descriptions. */
 
 /**
@@ -135,6 +151,9 @@ typedef struct { uint64_t opaque; } FTrainGemmOpId;
 typedef struct { uint64_t opaque; } FTrainGroupedABCDGemmOpId;
 typedef struct { uint64_t opaque; } FTrainGroupedBCDGemmOpId;
 typedef struct { uint64_t opaque; } FTrainGroupedABGemmOpId;
+typedef struct { uint64_t opaque; } FTrainLinearCEForwardPartialsOpId;
+typedef struct { uint64_t opaque; } FTrainLinearCEForwardFinalizeOpId;
+typedef struct { uint64_t opaque; } FTrainLinearCEBackwardOpId;
 
 // clang-format on
 
@@ -305,6 +324,38 @@ FTRAIN_API FTrainStatus ftrainPatternAddGroupedABGemm(FTrainPattern pattern, FTr
                                                       FTrainTensorListId c, FTrainTensorListId d, FTrainTensorId alpha,
                                                       FTrainTensorId beta);
 
+/**
+ * @brief Adds a Linear CE forward-partials topology operation to a Pattern.
+ *
+ * The operation computes local vocabulary-shard partials. Cross-rank
+ * communication remains outside Flash Train.
+ */
+FTRAIN_API FTrainStatus ftrainPatternAddLinearCEForwardPartials(
+    FTrainPattern pattern, FTrainLinearCEForwardPartialsOpId* op, FTrainTensorId hidden, FTrainTensorId weight,
+    FTrainTensorId labels, FTrainTensorId lse_local, FTrainTensorId target_logit_local);
+
+/**
+ * @brief Adds a Linear CE forward-finalize topology operation to a Pattern.
+ *
+ * The operation consumes communication-combined partials and produces the
+ * saved forward tensors used by backward.
+ */
+FTRAIN_API FTrainStatus ftrainPatternAddLinearCEForwardFinalize(
+    FTrainPattern pattern, FTrainLinearCEForwardFinalizeOpId* op, FTrainTensorId lse, FTrainTensorId target_logit,
+    FTrainTensorId labels, FTrainTensorId loss, FTrainTensorId maximum, FTrainTensorId saved_lse,
+    FTrainTensorId num_valid_tokens);
+
+/**
+ * @brief Adds a Linear CE backward topology operation to a Pattern.
+ *
+ * main_grad is an explicit external accumulation buffer. Communication and
+ * ownership of that buffer remain with the caller.
+ */
+FTRAIN_API FTrainStatus ftrainPatternAddLinearCEBackward(
+    FTrainPattern pattern, FTrainLinearCEBackwardOpId* op, FTrainTensorId dloss, FTrainTensorId hidden,
+    FTrainTensorId weight, FTrainTensorId labels, FTrainTensorId maximum, FTrainTensorId saved_lse,
+    FTrainTensorId num_valid_tokens, FTrainTensorId main_grad, FTrainTensorId d_hidden, FTrainTensorId d_weight);
+
 /* Ops matching. */
 
 /**
@@ -472,6 +523,22 @@ FTRAIN_API FTrainStatus ftrainArgsSetGroupedBCDGemm(FTrainArgs args, FTrainGroup
  */
 FTRAIN_API FTrainStatus ftrainArgsSetGroupedABGemm(FTrainArgs args, FTrainGroupedABGemmOpId op,
                                                    FTrainNumericType compute_type);
+
+FTRAIN_API FTrainStatus ftrainArgsSetLinearCEForwardPartials(
+    FTrainArgs args, FTrainLinearCEForwardPartialsOpId op, FTrainNumericType hidden_type,
+    FTrainNumericType weight_type, FTrainNumericType label_type, FTrainNumericType accumulation_type,
+    int64_t ignore_index, uint64_t shard_vocab_start, FTrainLinearCEReduction reduction);
+
+FTRAIN_API FTrainStatus ftrainArgsSetLinearCEForwardFinalize(
+    FTrainArgs args, FTrainLinearCEForwardFinalizeOpId op, FTrainNumericType hidden_type,
+    FTrainNumericType weight_type, FTrainNumericType label_type, FTrainNumericType accumulation_type,
+    int64_t ignore_index, FTrainLinearCEReduction reduction);
+
+FTRAIN_API FTrainStatus ftrainArgsSetLinearCEBackward(
+    FTrainArgs args, FTrainLinearCEBackwardOpId op, FTrainNumericType hidden_type, FTrainNumericType weight_type,
+    FTrainNumericType label_type, FTrainNumericType accumulation_type, FTrainNumericType main_grad_type,
+    int64_t ignore_index, uint64_t shard_vocab_start, FTrainLinearCEReduction reduction,
+    FTrainLinearCEMainGradMode main_grad_mode);
 
 /* Plan selection and execution. */
 

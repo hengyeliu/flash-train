@@ -201,3 +201,97 @@ extern "C" FTrainStatus ftrainArgsSetGroupedABGemm(FTrainArgs args, FTrainGroupe
                                                                        ftrain::GroupedABGemmAttributes(compute_type));
     });
 }
+
+namespace {
+
+void validateLinearCEDataTypes(FTrainNumericType hidden_type, FTrainNumericType weight_type,
+                               FTrainNumericType label_type, FTrainNumericType accumulation_type,
+                               const char* function_name) {
+    const FTrainNumericType types[] = {hidden_type, weight_type, label_type, accumulation_type};
+    for (FTrainNumericType type : types) {
+        if (type == FTRAIN_NUMERIC_TYPE_INVALID || type >= FTRAIN_NUMERIC_TYPE_COUNT) {
+            throw ftrain::Exception(FTRAIN_STATUS_INVALID_ARGUMENT, "%s received an invalid numeric type %u",
+                                    function_name, static_cast<unsigned int>(type));
+        }
+    }
+}
+
+void validateLinearCEReduction(FTrainLinearCEReduction reduction, const char* function_name) {
+    if (reduction == FTRAIN_LINEAR_CE_REDUCTION_INVALID || reduction >= FTRAIN_LINEAR_CE_REDUCTION_COUNT) {
+        throw ftrain::Exception(FTRAIN_STATUS_INVALID_ARGUMENT, "%s received an invalid reduction %u", function_name,
+                                static_cast<unsigned int>(reduction));
+    }
+}
+
+}  // namespace
+
+extern "C" FTrainStatus ftrainArgsSetLinearCEForwardPartials(
+    FTrainArgs args, FTrainLinearCEForwardPartialsOpId op, FTrainNumericType hidden_type,
+    FTrainNumericType weight_type, FTrainNumericType label_type, FTrainNumericType accumulation_type,
+    int64_t ignore_index, uint64_t shard_vocab_start, FTrainLinearCEReduction reduction) {
+    return ftrain::invokeApi([&] {
+        if (args == nullptr) {
+            throw ftrain::Exception(FTRAIN_STATUS_INVALID_ARGUMENT,
+                                    "ftrainArgsSetLinearCEForwardPartials: args handle must not be null");
+        }
+        validateLinearCEDataTypes(hidden_type, weight_type, label_type, accumulation_type,
+                                 "ftrainArgsSetLinearCEForwardPartials");
+        validateLinearCEReduction(reduction, "ftrainArgsSetLinearCEForwardPartials");
+        const ftrain::LinearCEDataAttributes data{hidden_type, weight_type, label_type, accumulation_type,
+                                                   ignore_index, reduction};
+        args->args.setOperation<ftrain::OperationKind::kLinearCEForwardPartials>(
+            ftrain::PatternOperationId{op.opaque},
+            ftrain::LinearCEForwardPartialsAttributes{data, shard_vocab_start});
+    });
+}
+
+extern "C" FTrainStatus ftrainArgsSetLinearCEForwardFinalize(
+    FTrainArgs args, FTrainLinearCEForwardFinalizeOpId op, FTrainNumericType hidden_type,
+    FTrainNumericType weight_type, FTrainNumericType label_type, FTrainNumericType accumulation_type,
+    int64_t ignore_index, FTrainLinearCEReduction reduction) {
+    return ftrain::invokeApi([&] {
+        if (args == nullptr) {
+            throw ftrain::Exception(FTRAIN_STATUS_INVALID_ARGUMENT,
+                                    "ftrainArgsSetLinearCEForwardFinalize: args handle must not be null");
+        }
+        validateLinearCEDataTypes(hidden_type, weight_type, label_type, accumulation_type,
+                                 "ftrainArgsSetLinearCEForwardFinalize");
+        validateLinearCEReduction(reduction, "ftrainArgsSetLinearCEForwardFinalize");
+        const ftrain::LinearCEDataAttributes data{hidden_type, weight_type, label_type, accumulation_type,
+                                                   ignore_index, reduction};
+        args->args.setOperation<ftrain::OperationKind::kLinearCEForwardFinalize>(
+            ftrain::PatternOperationId{op.opaque}, ftrain::LinearCEForwardFinalizeAttributes{data});
+    });
+}
+
+extern "C" FTrainStatus ftrainArgsSetLinearCEBackward(
+    FTrainArgs args, FTrainLinearCEBackwardOpId op, FTrainNumericType hidden_type, FTrainNumericType weight_type,
+    FTrainNumericType label_type, FTrainNumericType accumulation_type, FTrainNumericType main_grad_type,
+    int64_t ignore_index, uint64_t shard_vocab_start, FTrainLinearCEReduction reduction,
+    FTrainLinearCEMainGradMode main_grad_mode) {
+    return ftrain::invokeApi([&] {
+        if (args == nullptr) {
+            throw ftrain::Exception(FTRAIN_STATUS_INVALID_ARGUMENT,
+                                    "ftrainArgsSetLinearCEBackward: args handle must not be null");
+        }
+        validateLinearCEDataTypes(hidden_type, weight_type, label_type, accumulation_type,
+                                 "ftrainArgsSetLinearCEBackward");
+        if (main_grad_type == FTRAIN_NUMERIC_TYPE_INVALID || main_grad_type >= FTRAIN_NUMERIC_TYPE_COUNT) {
+            throw ftrain::Exception(FTRAIN_STATUS_INVALID_ARGUMENT,
+                                    "ftrainArgsSetLinearCEBackward received an invalid main_grad type %u",
+                                    static_cast<unsigned int>(main_grad_type));
+        }
+        validateLinearCEReduction(reduction, "ftrainArgsSetLinearCEBackward");
+        if (main_grad_mode == FTRAIN_LINEAR_CE_MAIN_GRAD_MODE_INVALID ||
+            main_grad_mode >= FTRAIN_LINEAR_CE_MAIN_GRAD_MODE_COUNT) {
+            throw ftrain::Exception(FTRAIN_STATUS_INVALID_ARGUMENT,
+                                    "ftrainArgsSetLinearCEBackward received an invalid main_grad mode %u",
+                                    static_cast<unsigned int>(main_grad_mode));
+        }
+        const ftrain::LinearCEDataAttributes data{hidden_type, weight_type, label_type, accumulation_type,
+                                                   ignore_index, reduction};
+        args->args.setOperation<ftrain::OperationKind::kLinearCEBackward>(
+            ftrain::PatternOperationId{op.opaque},
+            ftrain::LinearCEBackwardAttributes{data, main_grad_type, main_grad_mode, shard_vocab_start});
+    });
+}
