@@ -4,6 +4,7 @@
 add_library(
   flash_train_impl
   OBJECT api/common_api.cpp
+         api/gdn_api.cpp
          api/gemm_api.cpp
          api/ops_args_api.cpp
          api/pattern_api.cpp
@@ -20,6 +21,8 @@ add_library(
          engine.cpp
          family/gemm/family.cpp
          family/gemm/problem.cpp
+         family/gdn/family.cpp
+         family/gdn/problem.cpp
          primitive.cpp
          pattern.cpp)
 target_include_directories(
@@ -31,10 +34,37 @@ target_link_libraries(flash_train_impl PUBLIC Threads::Threads)
 # The platform-specific primitives: everything under primitive/hygon/
 # builds only for the selected platform and carries its dependencies.
 if(FTRAIN_PLATFORM_HYGON_HIP)
+  include("${PROJECT_SOURCE_DIR}/cmake/HygonOperatorSources.cmake")
+  foreach(FTRAIN_OPERATOR_ARCH IN LISTS FTRAIN_HYGON_HIP_ARCHS)
+    foreach(ftrain_operator IN ITEMS gdn gdn2)
+      set(ftrain_operator_sources "primitive/hygon/${ftrain_operator}/${FTRAIN_OPERATOR_ARCH}/CMakeLists.txt")
+      if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${ftrain_operator_sources}")
+        add_subdirectory("primitive/hygon/${ftrain_operator}/${FTRAIN_OPERATOR_ARCH}")
+      else()
+        message(STATUS "${ftrain_operator}: no ${FTRAIN_OPERATOR_ARCH} device sources; runtime unsupported")
+      endif()
+    endforeach()
+  endforeach()
   target_sources(
     flash_train_impl
     PRIVATE primitive/hygon/gemm/fp32_gemm.cpp
             primitive/hygon/gemm/fp32_gemm.hip)
+  if(TARGET ftrain_gdn_gfx936 AND TARGET ftrain_gdn_four_gfx936 AND
+     TARGET ftrain_gdn_bwd_gfx936)
+    target_sources(
+      flash_train_impl PRIVATE
+      primitive/hygon/gdn/fused_forward.cpp
+      primitive/hygon/gdn/four_forward.cpp
+      primitive/hygon/gdn/chunk_backward.cpp)
+    target_compile_definitions(flash_train_impl PRIVATE FTRAIN_HAS_GDN_GFX936=1)
+  endif()
+  if(TARGET ftrain_gdn2_gfx936 AND TARGET ftrain_gdn2_bwd_gfx936)
+    target_sources(
+      flash_train_impl PRIVATE
+      primitive/hygon/gdn2/chunk_forward.cpp
+      primitive/hygon/gdn2/chunk_backward.cpp)
+    target_compile_definitions(flash_train_impl PRIVATE FTRAIN_HAS_GDN2_GFX936=1)
+  endif()
   target_compile_options(flash_train_impl PRIVATE -Wno-return-type-void-func)
   target_link_libraries(flash_train_impl PUBLIC hip::host)
   target_link_libraries(flash_train_impl PRIVATE ROCTX::roctx)
@@ -48,6 +78,12 @@ endif()
 
 add_library(flash_train ${FTRAIN_LIBRARY_TYPE})
 target_sources(flash_train PRIVATE $<TARGET_OBJECTS:flash_train_impl>)
+if(FTRAIN_PLATFORM_HYGON_HIP)
+  get_property(ftrain_hygon_operator_targets GLOBAL PROPERTY FTRAIN_HYGON_OPERATOR_TARGETS)
+  foreach(ftrain_target IN LISTS ftrain_hygon_operator_targets)
+    target_sources(flash_train PRIVATE $<TARGET_OBJECTS:${ftrain_target}>)
+  endforeach()
+endif()
 add_library(flash_train::flash_train ALIAS flash_train)
 target_link_libraries(flash_train PRIVATE Threads::Threads)
 

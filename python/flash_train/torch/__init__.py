@@ -18,7 +18,7 @@ if os.path.exists(_native_library):
     ctypes.CDLL(_native_library)
 
 try:
-    from ._flash_train_torch import gemm
+    from ._flash_train_torch import gemm, gdn_forward, gdn_backward, gdn2_forward, gdn2_backward
 except ModuleNotFoundError as exc:
     # This shell ships even in wheels built without the binding; a missing
     # extension module is a build problem, not a missing dependency.
@@ -29,4 +29,9 @@ except ModuleNotFoundError as exc:
         "FTRAIN_BUILD_TORCH_BINDINGS=ON"
     ) from exc
 
-__all__ = ["gemm"]
+from .gdn import chunk_gated_delta_rule, chunk_gdn2
+
+__all__ = [
+    "gemm", "gdn_forward", "gdn_backward", "gdn2_forward", "gdn2_backward",
+    "chunk_gated_delta_rule", "chunk_gdn2",
+]

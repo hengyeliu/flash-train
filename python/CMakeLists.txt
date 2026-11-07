@@ -27,7 +27,8 @@ if(FTRAIN_BUILD_TORCH_BINDINGS)
 
   pybind11_add_module(_flash_train_torch ${FTRAIN_TORCH_MODULE_EXTRAS}
                       flash_train/torch/csrc/flash_train_torch.cpp
-                      flash_train/torch/csrc/flash_train_torch_capi.cpp)
+                      flash_train/torch/csrc/flash_train_torch_capi.cpp
+                      flash_train/torch/csrc/gdn_binding.cpp)
   target_compile_definitions(_flash_train_torch PRIVATE C10_CUDA_NO_CMAKE_CONFIGURE_FILE)
   target_link_libraries(_flash_train_torch PRIVATE flash_train torch
                                                    "${FTRAIN_TORCH_PYTHON_LIBRARY}")
