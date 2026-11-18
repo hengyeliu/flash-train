@@ -132,6 +132,8 @@ typedef struct { uint64_t opaque; } FTrainTensorId;
 typedef struct { uint64_t opaque; } FTrainTensorListId;
 typedef struct { uint64_t opaque; } FTrainGroupedTensorId;
 typedef struct { uint64_t opaque; } FTrainGemmOpId;
+typedef struct { uint64_t opaque; } FTrainMropeForwardOpId;
+typedef struct { uint64_t opaque; } FTrainMropeBackwardOpId;
 typedef struct { uint64_t opaque; } FTrainGroupedABCDGemmOpId;
 typedef struct { uint64_t opaque; } FTrainGroupedBCDGemmOpId;
 typedef struct { uint64_t opaque; } FTrainGroupedABGemmOpId;
@@ -304,6 +306,23 @@ FTRAIN_API FTrainStatus ftrainPatternAddGroupedABGemm(FTrainPattern pattern, FTr
                                                       FTrainGroupedTensorId a, FTrainGroupedTensorId b,
                                                       FTrainTensorListId c, FTrainTensorListId d, FTrainTensorId alpha,
                                                       FTrainTensorId beta);
+
+/** Add mRoPE forward ports. IDs must be distinct roles in pattern. */
+FTRAIN_API FTrainStatus ftrainPatternAddMropeForward(FTrainPattern pattern, FTrainMropeForwardOpId* op,
+                                                     FTrainTensorId input, FTrainTensorId raw_freqs,
+                                                     FTrainTensorId output);
+/** Copy mRoPE attributes. section must reference exactly three readable integers.
+ * Shape-dependent validity is checked at Plan creation. */
+FTRAIN_API FTrainStatus ftrainArgsSetMropeForward(FTrainArgs args, FTrainMropeForwardOpId op, const int64_t section[3],
+                                                  bool interleaved_mrope, bool fp32_compute);
+/** Add mRoPE backward ports. IDs must be distinct roles in pattern. */
+FTRAIN_API FTrainStatus ftrainPatternAddMropeBackward(FTrainPattern pattern, FTrainMropeBackwardOpId* op,
+                                                      FTrainTensorId grad_output, FTrainTensorId raw_freqs,
+                                                      FTrainTensorId grad_input);
+/** Copy mRoPE attributes. section must reference exactly three readable integers.
+ * Shape-dependent validity is checked at Plan creation. */
+FTRAIN_API FTrainStatus ftrainArgsSetMropeBackward(FTrainArgs args, FTrainMropeBackwardOpId op,
+                                                   const int64_t section[3], bool interleaved_mrope, bool fp32_compute);
 
 /* Ops matching. */
 

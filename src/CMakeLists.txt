@@ -5,6 +5,9 @@ add_library(
   flash_train_impl
   OBJECT api/common_api.cpp
          api/gemm_api.cpp
+         api/mrope_api.cpp
+         family/mrope/problem.cpp
+         family/mrope/family.cpp
          api/ops_args_api.cpp
          api/pattern_api.cpp
          api/plan_api.cpp
@@ -34,7 +37,13 @@ if(FTRAIN_PLATFORM_HYGON_HIP)
   target_sources(
     flash_train_impl
     PRIVATE primitive/hygon/gemm/fp32_gemm.cpp
-            primitive/hygon/gemm/fp32_gemm.hip)
+            primitive/hygon/gemm/fp32_gemm.hip
+            primitive/hygon/mrope/mrope.cpp
+            primitive/hygon/mrope/src/mrope_harness.hip)
+  # Mirror the top-level target selection for the runtime availability guard.
+  string(REPLACE ";" "," FTRAIN_MROPE_COMPILED_ARCHS "${CMAKE_HIP_ARCHITECTURES}")
+  target_compile_definitions(flash_train_impl PRIVATE
+                            FTRAIN_MROPE_COMPILED_ARCHS="${FTRAIN_MROPE_COMPILED_ARCHS}")
   target_compile_options(flash_train_impl PRIVATE -Wno-return-type-void-func)
   target_link_libraries(flash_train_impl PUBLIC hip::host)
   target_link_libraries(flash_train_impl PRIVATE ROCTX::roctx)

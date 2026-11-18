@@ -11,6 +11,7 @@ add_executable(
   cache/cache_test.cpp
   engine/engine_test.cpp
   family/gemm/gemm_test.cpp
+  family/mrope/mrope_test.cpp
   handle/handle_test.cpp
   operation/op_definitions_test.cpp
   operation/op_schema_test.cpp

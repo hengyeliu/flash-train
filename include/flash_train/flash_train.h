@@ -47,6 +47,27 @@ FTRAIN_API FTrainStatus ftrainGemm(FTrainStorageView a, FTrainStorageView b, FTr
                                    FTrainStorageView alpha, FTrainStorageView beta, FTrainNumericType compute_type,
                                    void* workspace, uint64_t workspace_bytes, FTrainStream stream);
 
+/** mRoPE uses contiguous, 16-byte-aligned, non-overlapping device ports.
+ * Source/output are matching positive SBHD tensors (D <= 1024), BF16/FP16/FP32;
+ * raw_freqs is FP32 [3,B,S,R/2], 0 < R <= D. Sections are non-negative and sum
+ * to R/2; interleaved sections must be [(half+2)/3,(half+1)/3,half/3].
+ * fp32_compute=false rounds intermediates to activation dtype; true rounds
+ * only the output. The caller owns all buffers and selects their current HIP
+ * device. Zero workspace is required. Execution is asynchronous on stream.
+ * No parameter main_grad, frequency gradient or accumulation is performed.
+ * Malformed shapes/sections return INVALID_ARGUMENT, index/storage overflow
+ * returns OVERFLOW, and unsupported dtype/layout/alignment/alias/device returns
+ * UNSUPPORTED. Device enqueue failures return INTERNAL_ERROR.
+ */
+FTRAIN_API FTrainStatus ftrainMropeForward(FTrainStorageView input, FTrainStorageView raw_freqs,
+                                           FTrainStorageView output, const int64_t section[3], bool interleaved_mrope,
+                                           bool fp32_compute, void* workspace, uint64_t workspace_bytes,
+                                           FTrainStream stream);
+FTRAIN_API FTrainStatus ftrainMropeBackward(FTrainStorageView grad_output, FTrainStorageView raw_freqs,
+                                            FTrainStorageView grad_input, const int64_t section[3],
+                                            bool interleaved_mrope, bool fp32_compute, void* workspace,
+                                            uint64_t workspace_bytes, FTrainStream stream);
+
 #ifdef __cplusplus
 }
 #endif

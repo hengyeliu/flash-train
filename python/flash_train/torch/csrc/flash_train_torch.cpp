@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <torch/extension.h>
+#include <c10/core/DeviceGuard.h>
+#include <string>
+#include <vector>
 
 #include <cstdint>
 #include <optional>
@@ -16,6 +19,10 @@ namespace flash_train_torch {
 unsigned char callFp32Gemm(const void* a, const std::int64_t* a_dims, const void* b, const std::int64_t* b_dims,
                            const void* c, const std::int64_t* c_dims, void* d, const std::int64_t* d_dims,
                            const void* alpha, const void* beta, void* stream);
+
+std::string callMrope(const void* input, const std::int64_t* dims, const void* freqs, const std::int64_t* freq_dims,
+                      void* output, int dtype, const std::int64_t* section, bool interleaved, bool fp32_compute,
+                      bool inverse, void* stream);
 
 }  // namespace flash_train_torch
 
@@ -66,9 +73,44 @@ at::Tensor gemm(const at::Tensor& a, const at::Tensor& b, const std::optional<at
     return d;
 }
 
+at::Tensor alignedContinuous(const at::Tensor& input) {
+    auto result = input.resolve_neg().contiguous();
+    if (reinterpret_cast<std::uintptr_t>(result.data_ptr()) % 16 != 0) { result = result.clone(); }
+    return result;
+}
+
+at::Tensor mrope(const at::Tensor& input, const at::Tensor& raw_freqs, const std::vector<std::int64_t>& section,
+                 bool interleaved, bool fp32_compute, bool inverse) {
+    TORCH_CHECK(input.is_cuda() && raw_freqs.is_cuda(), "mRoPE requires device tensors");
+    TORCH_CHECK(input.device() == raw_freqs.device(), "mRoPE tensors must be on the same device");
+    TORCH_CHECK(input.dim() == 4 && raw_freqs.dim() == 4, "mRoPE requires rank-four tensors");
+    TORCH_CHECK(raw_freqs.scalar_type() == at::kFloat, "raw_freqs must be FP32");
+    TORCH_CHECK(!raw_freqs.requires_grad(), "mRoPE does not compute raw_freqs gradients");
+    TORCH_CHECK(section.size() == 3, "mRoPE section must contain three integers");
+    int dtype = -1;
+    if (input.scalar_type() == at::kFloat) { dtype = 0; }
+    if (input.scalar_type() == at::kHalf) { dtype = 1; }
+    if (input.scalar_type() == at::kBFloat16) { dtype = 2; }
+    TORCH_CHECK(dtype >= 0, "mRoPE input must be BF16, FP16 or FP32");
+    // Generic guard dispatches through Torch without including HIP/CUDA headers.
+    const c10::DeviceGuard device_guard(input.device());
+    const at::NoGradGuard no_grad;
+    const auto source = alignedContinuous(input);
+    const auto freqs  = alignedContinuous(raw_freqs);
+    auto output       = at::empty(input.sizes(), input.options());
+    const auto error  = flash_train_torch::callMrope(source.data_ptr(), source.sizes().data(), freqs.data_ptr(),
+                                                     freqs.sizes().data(), output.data_ptr(), dtype, section.data(),
+                                                     interleaved, fp32_compute, inverse, currentStream());
+    TORCH_CHECK(error.empty(), "mRoPE failed: ", error);
+    return output;
+}
+
 }  // namespace
 
 PYBIND11_MODULE(_flash_train_torch, m) {
+    m.def("mrope", &mrope, "Internal out-of-place mRoPE launch; use the public autograd wrapper", py::arg("input"),
+          py::arg("raw_freqs"), py::arg("section"), py::arg("interleaved_mrope") = false,
+          py::arg("fp32_compute") = false, py::arg("inverse") = false);
     m.doc() = "flash-train PyTorch bindings";
     m.def("gemm", &gemm, "d = alpha * (a @ b) + beta * c on the current stream", py::arg("a"), py::arg("b"),
           py::arg("c") = std::nullopt, py::arg("alpha") = 1.0, py::arg("beta") = 0.0);
